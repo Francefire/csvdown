@@ -20,5 +20,5 @@ EXPOSE 5000
 VOLUME /downloads
 ENV DOWNLOAD_DIR=/downloads
 
-# Run with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+# Run with Gunicorn (Timeout updated to 10 minutes for slow downloads)
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "--timeout", "600", "app:app"]
