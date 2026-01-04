@@ -60,9 +60,17 @@ def process_csv():
             
             file_path = os.path.join(app.config['DOWNLOAD_FOLDER'], safe_filename)
             
-            # Simple check if file already exists to skip? 
-            # User didn't ask, but it's good practice. Overwriting is fine too.
-            print(f"Processing: {safe_filename}")
+            # Match the ownership of the download directory (host volume)
+            try:
+                # Get the volume directory's stats
+                parent_stat = os.stat(app.config['DOWNLOAD_FOLDER'])
+                # Change the file's owner/group to match the parent directory
+                os.chown(file_path, parent_stat.st_uid, parent_stat.st_gid)
+                # Also ensure standard permissions (User: RW, Group: RW, Others: R)
+                os.chmod(file_path, 0o664)
+            except Exception as e:
+                print(f"Permission fix failed for {safe_filename}: {e}")
+                # Don't fail the whole request for this, just log it
 
             try:
                 # Download
@@ -72,6 +80,13 @@ def process_csv():
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
                 
+                # Match ownership immediately after download (before tagging potentially fails)
+                try:
+                    os.chown(file_path, parent_stat.st_uid, parent_stat.st_gid)
+                    os.chmod(file_path, 0o664)
+                except Exception as e:
+                    print(f"Permission fix failed for {safe_filename}: {e}")
+
                 # Tag
                 try:
                     audio = FLAC(file_path)
