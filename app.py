@@ -60,17 +60,7 @@ def process_csv():
             
             file_path = os.path.join(app.config['DOWNLOAD_FOLDER'], safe_filename)
             
-            # Match the ownership of the download directory (host volume)
-            try:
-                # Get the volume directory's stats
-                parent_stat = os.stat(app.config['DOWNLOAD_FOLDER'])
-                # Change the file's owner/group to match the parent directory
-                os.chown(file_path, parent_stat.st_uid, parent_stat.st_gid)
-                # Also ensure standard permissions (User: RW, Group: RW, Others: R)
-                os.chmod(file_path, 0o664)
-            except Exception as e:
-                print(f"Permission fix failed for {safe_filename}: {e}")
-                # Don't fail the whole request for this, just log it
+            print(f"Processing: {safe_filename}")
 
             try:
                 # Download
@@ -80,12 +70,15 @@ def process_csv():
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
                 
-                # Match ownership immediately after download (before tagging potentially fails)
+                # Match ownership logic
                 try:
+                    # Capture stats fresh or use cached? Fresh is fine.
+                    # We do this AFTER download so the file definitely exists.
+                    parent_stat = os.stat(app.config['DOWNLOAD_FOLDER'])
                     os.chown(file_path, parent_stat.st_uid, parent_stat.st_gid)
-                    os.chmod(file_path, 0o664)
-                except Exception as e:
-                    print(f"Permission fix failed for {safe_filename}: {e}")
+                    os.chmod(file_path, 0o666) # RW for everyone to be safe, or 664
+                except Exception as perm_err:
+                    print(f"Permission fix warning for {safe_filename}: {perm_err}")
 
                 # Tag
                 try:
@@ -98,7 +91,7 @@ def process_csv():
                     processed_files.append(safe_filename)
                 except Exception as e:
                     errors.append(f"Downloaded but failed to tag {safe_filename}: {e}")
-                    processed_files.append(safe_filename) # Still count as processed
+                    processed_files.append(safe_filename) 
 
             except Exception as e:
                 errors.append(f"Failed to download {safe_filename}: {e}")
